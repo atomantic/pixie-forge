@@ -32,6 +32,7 @@ export default function ImaginePage() {
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const [gallery, setGallery] = useState([])
+  const [preview, setPreview] = useState(null)
   const eventSourceRef = useRef(null)
 
   useEffect(() => {
@@ -397,7 +398,12 @@ export default function ImaginePage() {
               const loras = (img.lora_paths || []).map(p => p.split('/').pop().replace(/^lora-/, '').replace(/\.safetensors$/, ''))
               return (
                 <div key={img.filename} className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden group">
-                  <img src={`/images/${img.filename}`} alt="" className="w-full aspect-square object-cover" />
+                  <img
+                    src={`/images/${img.filename}`}
+                    alt=""
+                    className="w-full aspect-square object-cover cursor-pointer"
+                    onClick={() => setPreview(img)}
+                  />
                   <div className="p-3 space-y-1.5">
                     {img.prompt && (
                       <div className="flex items-start gap-1">
@@ -454,6 +460,42 @@ export default function ImaginePage() {
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Full-size preview lightbox */}
+      {preview && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setPreview(null)}
+        >
+          <div className="relative max-w-full max-h-full" onClick={e => e.stopPropagation()}>
+            <img
+              src={`/images/${preview.filename}`}
+              alt=""
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+            />
+            <div className="absolute top-2 right-2 flex gap-2">
+              <a
+                href={`/images/${preview.filename}`}
+                download
+                className="px-3 py-1.5 bg-gray-800/80 hover:bg-gray-700 text-white text-xs rounded-lg backdrop-blur"
+              >
+                Download
+              </a>
+              <button
+                onClick={() => setPreview(null)}
+                className="px-3 py-1.5 bg-gray-800/80 hover:bg-gray-700 text-white text-xs rounded-lg backdrop-blur"
+              >
+                Close
+              </button>
+            </div>
+            {preview.prompt && (
+              <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent rounded-b-lg">
+                <p className="text-sm text-gray-200">{preview.prompt}</p>
+              </div>
+            )}
           </div>
         </div>
       )}
