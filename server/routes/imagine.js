@@ -75,13 +75,19 @@ router.post('/', (req, res) => {
   const actualSteps = steps ? parseInt(steps, 10) : model.steps
   const actualGuidance = guidance !== undefined && guidance !== '' ? parseFloat(guidance) : model.guidance
 
-  // Find mflux-generate: next to python on Unix, in Scripts/ on Windows
-  const pythonDir = path.dirname(settings.pythonPath)
-  const mfluxBin = process.platform === 'win32'
-    ? path.join(pythonDir, 'Scripts', 'mflux-generate.exe')
-    : path.join(pythonDir, 'mflux-generate')
+  // On Windows use the diffusers-based Python script; on macOS use mflux-generate
+  let spawnBin, args
+  if (process.platform === 'win32') {
+    const scriptPath = path.join(__dirname, '..', 'scripts', 'imagine_win.py')
+    spawnBin = settings.pythonPath
+    args = [scriptPath]
+  } else {
+    const pythonDir = path.dirname(settings.pythonPath)
+    spawnBin = path.join(pythonDir, 'mflux-generate')
+    args = []
+  }
 
-  const args = [
+  args.push(
     '--model', modelId,
     '--prompt', prompt,
     '--height', String(parseInt(height, 10)),
@@ -91,7 +97,7 @@ router.post('/', (req, res) => {
     '--quantize', String(quantize),
     '--output', outputPath,
     '--metadata',
-  ]
+  )
 
   if (actualGuidance > 0) {
     args.push('--guidance', String(actualGuidance))
@@ -127,7 +133,7 @@ router.post('/', (req, res) => {
 
   console.log(`🎨 Starting image generation: ${modelId} ${parseInt(width, 10)}x${parseInt(height, 10)} steps=${actualSteps}`)
 
-  const proc = spawn(mfluxBin, args, {
+  const proc = spawn(spawnBin, args, {
     env: { ...process.env },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -140,12 +146,15 @@ router.post('/', (req, res) => {
     }
   }
 
+  // Lines to suppress from stderr (xformers/triton warnings, bitsandbytes noise)
+  const NOISE_RE = /xformers|xFormers|triton|Triton|bitsandbytes|Please reinstall|Memory-efficient|Set XFORMERS|FutureWarning|UserWarning|DeprecationWarning|torch\.distributed|Unable to import.*torchao|Skipping import of cpp|NOTE: Redirects/i
+
   proc.stderr.on('data', (chunk) => {
     const text = chunk.toString()
     const lines = text.split(/[\n\r]+/)
     for (const line of lines) {
       const trimmed = line.trim()
-      if (!trimmed) continue
+      if (!trimmed || NOISE_RE.test(trimmed)) continue
 
       // mflux outputs progress like "100%|████| 8/8 [00:05<00:00,  1.43it/s]"
       const progressMatch = trimmed.match(/(\d+)%\|/)

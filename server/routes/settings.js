@@ -5,10 +5,15 @@ const { loadSettings, saveSettings, getSettings } = require('../settings')
 
 const router = express.Router()
 
-const REQUIRED_PACKAGES = [
+// mlx and related packages are Apple Silicon (macOS) only
+const REQUIRED_PACKAGES_MACOS = [
   'mlx', 'mlx_vlm', 'mlx_video', 'transformers',
   'safetensors', 'huggingface_hub', 'numpy', 'cv2', 'tqdm',
 ]
+const REQUIRED_PACKAGES_WINDOWS = [
+  'transformers', 'safetensors', 'huggingface_hub', 'numpy', 'cv2', 'tqdm',
+]
+const REQUIRED_PACKAGES = process.platform === 'win32' ? REQUIRED_PACKAGES_WINDOWS : REQUIRED_PACKAGES_MACOS
 
 router.get('/', (req, res) => {
   const s = loadSettings()
@@ -91,7 +96,7 @@ router.post('/validate', (req, res) => {
   }
 
   const script = REQUIRED_PACKAGES.map(pkg =>
-    `try:\n import ${pkg}\n print("OK:${pkg}")\nexcept ImportError:\n print("MISSING:${pkg}")`
+    `try:\n import ${pkg}\n print("OK:${pkg}")\nexcept Exception:\n print("MISSING:${pkg}")`
   ).join('\n')
 
   execFile(settings.pythonPath, ['-c', script], { timeout: 30000 }, (err, stdout) => {
@@ -99,8 +104,9 @@ router.post('/validate', (req, res) => {
       return res.json({ success: false, message: `Python error: ${err.message}` })
     }
 
-    const lines = stdout.trim().split('\n')
-    const missing = lines.filter(l => l.startsWith('MISSING:')).map(l => l.slice(8))
+    // Split on \r\n or \n to handle Windows line endings
+    const lines = stdout.trim().split(/\r?\n/)
+    const missing = lines.filter(l => l.startsWith('MISSING:')).map(l => l.slice(8).trim())
 
     if (missing.length === 0) {
       return res.json({ success: true, message: 'All required packages installed.' })
@@ -112,7 +118,8 @@ router.post('/validate', (req, res) => {
       mlx_video: 'mlx-video-with-audio',
       cv2: 'opencv-python',
       huggingface_hub: 'huggingface_hub',
-      transformers: 'transformers<5',
+      // transformers<5 only needed for mlx compatibility on macOS
+      ...(process.platform !== 'win32' ? { transformers: 'transformers<5' } : {}),
     }
     const missingPip = missing.map(m => pipNames[m] || m)
 

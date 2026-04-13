@@ -111,7 +111,7 @@ export default function SettingsPage() {
             type="text"
             value={settings.pythonPath || ''}
             onChange={e => setSettings(s => ({ ...s, pythonPath: e.target.value }))}
-            placeholder="/usr/bin/python3"
+            placeholder={navigator.platform.startsWith('Win') ? 'C:\\Python312\\python.exe' : '/usr/bin/python3'}
             className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200"
           />
           <button onClick={detectPython} disabled={detecting} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded border border-gray-600">
