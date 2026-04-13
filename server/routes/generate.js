@@ -87,7 +87,25 @@ router.post('/', upload.single('sourceImage'), (req, res) => {
       console.log(`⚠️ Source image not found: ${localPath}`)
     }
   }
-  if (sourceImagePath) console.log(`🖼️ Image-to-Video mode: ${sourceImagePath}`)
+  // Resize source image to match target video resolution before passing to model
+  if (sourceImagePath) {
+    const ffmpeg = findFfmpeg()
+    if (ffmpeg) {
+      const resizedPath = path.join(require('os').tmpdir(), `resized-${jobId}.png`)
+      const { execFileSync } = require('child_process')
+      try {
+        execFileSync(ffmpeg, [
+          '-i', sourceImagePath,
+          '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:black`,
+          '-y', resizedPath,
+        ], { timeout: 10000 })
+        console.log(`🖼️ Image-to-Video mode: ${sourceImagePath} → resized to ${w}x${h}`)
+        sourceImagePath = resizedPath
+      } catch (err) {
+        console.log(`⚠️ Failed to resize source image, using original: ${err.message}`)
+      }
+    }
+  }
 
   // Build spawn args — platform-specific backends
   let spawnBin, args
@@ -210,6 +228,9 @@ router.post('/', upload.single('sourceImage'), (req, res) => {
   proc.on('close', (code, signal) => {
     activeProcess = null
     if (req.file) fs.unlink(req.file.path, () => {})
+    // Clean up resized temp image
+    const resizedTmp = path.join(require('os').tmpdir(), `resized-${jobId}.png`)
+    fs.unlink(resizedTmp, () => {})
 
     if (code !== 0) {
       job.status = 'error'
