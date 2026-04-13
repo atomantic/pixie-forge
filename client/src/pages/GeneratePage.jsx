@@ -1,12 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
-const MODELS = [
-  { id: 'ltx2_unified', repo: 'notapalindrome/ltx2-mlx-av', name: 'LTX-2 Unified', size: '~42GB', stepsRange: [20, 40] },
-  { id: 'ltx23_unified', repo: 'notapalindrome/ltx23-mlx-av', name: 'LTX-2.3 Unified (Beta)', size: '~48GB', stepsRange: [15, 30] },
-  { id: 'ltx23_distilled_q4', repo: 'notapalindrome/ltx23-mlx-av-q4', name: 'LTX-2.3 Distilled Q4 (Beta)', size: '~22GB', stepsRange: [15, 30] },
-]
-
 const RESOLUTIONS = [
   { label: '512x320 (fast)', w: 512, h: 320 },
   { label: '768x512 (default)', w: 768, h: 512 },
@@ -19,9 +13,10 @@ const TILING_MODES = ['auto', 'none', 'default', 'aggressive', 'conservative', '
 
 export default function GeneratePage() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const [models, setModels] = useState([])
   const [prompt, setPrompt] = useState('')
   const [negativePrompt, setNegativePrompt] = useState('')
-  const [modelId, setModelId] = useState('ltx23_distilled_q4')
+  const [modelId, setModelId] = useState('')
   const [width, setWidth] = useState(768)
   const [height, setHeight] = useState(512)
   const [numFrames, setNumFrames] = useState(121)
@@ -40,6 +35,13 @@ export default function GeneratePage() {
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const eventSourceRef = useRef(null)
+
+  useEffect(() => {
+    fetch('/api/generate/models').then(r => r.json()).then(data => {
+      setModels(data)
+      if (data.length > 0) setModelId(m => m || data[0].id)
+    }).catch(() => {})
+  }, [])
 
   const sourceImagePreview = useMemo(() => {
     if (sourceImageUrl) return sourceImageUrl
@@ -209,7 +211,7 @@ export default function GeneratePage() {
           <div>
             <label className="block text-xs font-medium text-gray-400 mb-1">Model</label>
             <select value={modelId} onChange={e => setModelId(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200">
-              {MODELS.map(m => <option key={m.id} value={m.id}>{m.name} ({m.size})</option>)}
+              {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>
 

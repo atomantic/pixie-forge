@@ -4,10 +4,12 @@ const path = require('path')
 const fs = require('fs')
 const { v4: uuidv4 } = require('uuid')
 const multer = require('multer')
-const { getSettings } = require('../settings')
+const { getSettings, DATA_DIR } = require('../settings')
 const { loadHistory, saveHistory } = require('./history')
 
 const router = express.Router()
+
+const IMAGES_DIR = path.join(DATA_DIR, 'images')
 
 const jobs = new Map()
 let activeProcess = null
@@ -21,11 +23,21 @@ const upload = multer({
   },
 })
 
-const MODELS = {
-  ltx2_unified: 'notapalindrome/ltx2-mlx-av',
-  ltx23_unified: 'notapalindrome/ltx23-mlx-av',
-  ltx23_distilled_q4: 'notapalindrome/ltx23-mlx-av-q4',
+const MODELS_MACOS = {
+  ltx2_unified:       { name: 'LTX-2 Unified (~42 GB)',          repo: 'notapalindrome/ltx2-mlx-av',      steps: 30, guidance: 3.0 },
+  ltx23_unified:      { name: 'LTX-2.3 Unified Beta (~48 GB)',   repo: 'notapalindrome/ltx23-mlx-av',     steps: 25, guidance: 3.0 },
+  ltx23_distilled_q4: { name: 'LTX-2.3 Distilled Q4 (~22 GB)',  repo: 'notapalindrome/ltx23-mlx-av-q4',  steps: 25, guidance: 3.0 },
 }
+
+const MODELS_WINDOWS = {
+  ltx_video: { name: 'LTX-Video 0.9.5 — T2V + I2V (~9.5 GB, auto-downloads)', steps: 25, guidance: 3.0 },
+}
+
+const MODELS = process.platform === 'win32' ? MODELS_WINDOWS : MODELS_MACOS
+
+router.get('/models', (req, res) => {
+  res.json(Object.entries(MODELS).map(([id, m]) => ({ id, ...m })))
+})
 
 router.post('/', upload.single('sourceImage'), (req, res) => {
   console.log(`📥 Generate request: file=${req.file?.originalname || 'none'} sourceImageFile=${req.body.sourceImageFile || 'none'}`)
@@ -35,59 +47,39 @@ router.post('/', upload.single('sourceImage'), (req, res) => {
   }
 
   const jobId = uuidv4()
+  const defaultModelId = process.platform === 'win32' ? 'ltx_video' : 'ltx2_unified'
   const {
-    prompt, negativePrompt = '', modelId = 'ltx2_unified',
+    prompt, negativePrompt = '', modelId = defaultModelId,
     width = '768', height = '512', numFrames = '121',
-    fps = '24', steps = '30', guidanceScale = '3.0',
-    seed = '', tiling = 'auto', disableAudio = 'false',
+    fps = '24', steps, guidanceScale, seed = '',
+    tiling = 'auto', disableAudio = 'false',
   } = req.body
 
   if (!prompt?.trim()) {
     return res.status(400).json({ error: 'Prompt is required' })
   }
 
-  const modelRepo = MODELS[modelId]
-  if (!modelRepo) {
+  const model = MODELS[modelId]
+  if (!model) {
     return res.status(400).json({ error: `Unknown model: ${modelId}` })
   }
 
   const filename = `${jobId}.mp4`
   const outputPath = path.join(settings.videosDir, filename)
   const actualSeed = seed ? parseInt(seed, 10) : Math.floor(Math.random() * 2147483647)
+  const actualSteps = steps ? parseInt(steps, 10) : model.steps
+  const actualGuidance = guidanceScale !== undefined && guidanceScale !== '' ? parseFloat(guidanceScale) : model.guidance
 
   const w = Math.floor(parseInt(width, 10) / 64) * 64
   const h = Math.floor(parseInt(height, 10) / 64) * 64
   const parsedNumFrames = parseInt(numFrames, 10)
   const parsedFps = parseInt(fps, 10)
 
-  const args = [
-    '-m', 'mlx_video.generate_av',
-    '--prompt', prompt,
-    '--height', String(h),
-    '--width', String(w),
-    '--num-frames', String(numFrames),
-    '--seed', String(actualSeed),
-    '--fps', String(fps),
-    '--steps', String(steps),
-    '--cfg-scale', String(guidanceScale),
-    '--output-path', outputPath,
-    '--model-repo', modelRepo,
-    '--text-encoder-repo', 'mlx-community/gemma-3-12b-it-4bit',
-    '--tiling', tiling,
-  ]
-
-  if (negativePrompt.trim()) {
-    args.push('--negative-prompt', negativePrompt)
-  }
-  if (disableAudio === 'true') {
-    args.push('--no-audio')
-  }
+  // Resolve source image from upload or from the images gallery
   let sourceImagePath = null
   if (req.file) {
     sourceImagePath = req.file.path
   } else if (req.body.sourceImageFile) {
-    // Image from Imagine page — already on disk
-    const { IMAGES_DIR } = require('./imagine')
     const localPath = path.join(IMAGES_DIR, path.basename(req.body.sourceImageFile))
     if (fs.existsSync(localPath)) {
       sourceImagePath = localPath
@@ -95,9 +87,48 @@ router.post('/', upload.single('sourceImage'), (req, res) => {
       console.log(`⚠️ Source image not found: ${localPath}`)
     }
   }
-  if (sourceImagePath) {
-    args.push('--image', sourceImagePath)
-    console.log(`🖼️ Image-to-Video mode: ${sourceImagePath}`)
+  if (sourceImagePath) console.log(`🖼️ Image-to-Video mode: ${sourceImagePath}`)
+
+  // Build spawn args — platform-specific backends
+  let spawnBin, args
+  if (process.platform === 'win32') {
+    const scriptPath = path.join(__dirname, '..', 'scripts', 'generate_win.py')
+    spawnBin = settings.pythonPath
+    args = [
+      scriptPath,
+      '--model', modelId,
+      '--prompt', prompt,
+      '--height', String(h),
+      '--width', String(w),
+      '--num-frames', String(parsedNumFrames),
+      '--fps', String(parsedFps),
+      '--steps', String(actualSteps),
+      '--guidance', String(actualGuidance),
+      '--seed', String(actualSeed),
+      '--output', outputPath,
+    ]
+    if (negativePrompt.trim()) args.push('--negative-prompt', negativePrompt)
+    if (sourceImagePath) args.push('--image', sourceImagePath)
+  } else {
+    spawnBin = settings.pythonPath
+    args = [
+      '-m', 'mlx_video.generate_av',
+      '--prompt', prompt,
+      '--height', String(h),
+      '--width', String(w),
+      '--num-frames', String(parsedNumFrames),
+      '--seed', String(actualSeed),
+      '--fps', String(parsedFps),
+      '--steps', String(actualSteps),
+      '--cfg-scale', String(actualGuidance),
+      '--output-path', outputPath,
+      '--model-repo', model.repo,
+      '--text-encoder-repo', 'mlx-community/gemma-3-12b-it-4bit',
+      '--tiling', tiling,
+    ]
+    if (negativePrompt.trim()) args.push('--negative-prompt', negativePrompt)
+    if (disableAudio === 'true') args.push('--no-audio')
+    if (sourceImagePath) args.push('--image', sourceImagePath)
   }
 
   const jobMeta = {
@@ -115,8 +146,8 @@ router.post('/', upload.single('sourceImage'), (req, res) => {
   const job = { ...jobMeta, clients: [], status: 'running' }
   jobs.set(jobId, job)
 
-  console.log(`🎬 Running: ${settings.pythonPath} ${args.join(' ')}`)
-  const proc = spawn(settings.pythonPath, args, {
+  console.log(`🎬 Starting video generation: ${modelId} ${w}x${h} frames=${parsedNumFrames} steps=${actualSteps}`)
+  const proc = spawn(spawnBin, args, {
     env: { ...process.env, PYTHONPATH: undefined },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -131,9 +162,12 @@ router.post('/', upload.single('sourceImage'), (req, res) => {
     }
   }
 
+  // Suppress noisy warnings from xformers / triton / bitsandbytes on Windows
+  const NOISE_RE = /xformers|xFormers|triton|Triton|bitsandbytes|Please reinstall|Memory-efficient|Set XFORMERS|FutureWarning|UserWarning|DeprecationWarning|torch\.distributed|Unable to import.*torchao|Skipping import of cpp|NOTE: Redirects/i
+
   function handleLine(line) {
     line = line.trim()
-    if (!line) return
+    if (!line || NOISE_RE.test(line)) return
 
     if (line.startsWith('STATUS:')) {
       broadcast({ type: 'status', message: line.slice(7) })
@@ -144,6 +178,13 @@ router.post('/', upload.single('sourceImage'), (req, res) => {
       broadcast({ type: 'progress', progress: step / total, message: parts.slice(5).join(':') })
     } else if (line.startsWith('DOWNLOAD:')) {
       broadcast({ type: 'status', message: `Downloading model... ${line.slice(9)}` })
+    } else {
+      // tqdm-style progress: "50%|████████████▒▒▒▒▒▒▒▒| 1/2"
+      const progressMatch = line.match(/(\d+)%\|/)
+      if (progressMatch) {
+        const pct = parseInt(progressMatch[1], 10) / 100
+        broadcast({ type: 'progress', progress: pct, message: line })
+      }
     }
   }
 
@@ -265,8 +306,6 @@ router.post('/last-frame/:id', (req, res) => {
   const videoPath = path.join(settings.videosDir, item.filename)
   if (!fs.existsSync(videoPath)) return res.status(404).json({ error: 'Video file not found' })
 
-  // Save last frame into images dir so it can be used as source
-  const { IMAGES_DIR } = require('./imagine')
   const frameFilename = `lastframe-${item.id}.png`
   const framePath = path.join(IMAGES_DIR, frameFilename)
 
