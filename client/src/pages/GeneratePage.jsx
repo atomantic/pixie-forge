@@ -13,7 +13,7 @@ const RESOLUTIONS = [
   { label: '1024x576 (HD)', w: 1024, h: 576 },
 ]
 
-const FRAME_COUNTS = [25, 33, 49, 65, 81, 97, 121]
+const FRAME_COUNTS = [25, 33, 49, 65, 81, 97, 121, 161, 201, 241]
 
 const TILING_MODES = ['auto', 'none', 'default', 'aggressive', 'conservative', 'spatial', 'temporal']
 
@@ -42,14 +42,17 @@ export default function GeneratePage() {
   const eventSourceRef = useRef(null)
 
   const sourceImagePreview = useMemo(() => {
+    if (sourceImageUrl) return sourceImageUrl
     if (!sourceImage) return null
-    const url = URL.createObjectURL(sourceImage)
-    return url
-  }, [sourceImage])
+    return URL.createObjectURL(sourceImage)
+  }, [sourceImage, sourceImageUrl])
 
   useEffect(() => {
     return () => {
-      if (sourceImagePreview) URL.revokeObjectURL(sourceImagePreview)
+      // Only revoke blob URLs, not server URLs
+      if (sourceImagePreview && sourceImagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(sourceImagePreview)
+      }
     }
   }, [sourceImagePreview])
 
@@ -57,17 +60,9 @@ export default function GeneratePage() {
   useEffect(() => {
     const imageUrl = searchParams.get('sourceImageUrl')
     if (imageUrl) {
+      // Store the URL for preview and the filename for server-side lookup
       setSourceImageUrl(imageUrl)
-      // Fetch the image and convert to a File object for upload
-      fetch(imageUrl)
-        .then(r => r.blob())
-        .then(blob => {
-          const file = new File([blob], 'source.png', { type: 'image/png' })
-          setSourceImage(file)
-          // Clean the URL param
-          setSearchParams({}, { replace: true })
-        })
-        .catch(() => {})
+      setSearchParams({}, { replace: true })
     }
   }, [])
 
@@ -88,6 +83,7 @@ export default function GeneratePage() {
 
   function clearImage() {
     setSourceImage(null)
+    setSourceImageUrl(null)
   }
 
   async function handleGenerate(e) {
@@ -114,6 +110,7 @@ export default function GeneratePage() {
     formData.append('tiling', tiling)
     formData.append('disableAudio', disableAudio)
     if (sourceImage) formData.append('sourceImage', sourceImage)
+    if (sourceImageUrl) formData.append('sourceImageFile', sourceImageUrl.split('/').pop())
 
     try {
       const res = await fetch('/api/generate', { method: 'POST', body: formData })
@@ -323,9 +320,27 @@ export default function GeneratePage() {
             autoPlay
             className="w-full rounded-lg"
           />
-          <div className="flex gap-4 text-xs text-gray-500">
-            <span>Seed: {result.seed}</span>
-            <a href={`/videos/${result.filename}`} download className="text-indigo-400 hover:text-indigo-300">Download</a>
+          <div className="flex gap-4 items-center">
+            <span className="text-xs text-gray-500">Seed: {result.seed}</span>
+            <a href={`/videos/${result.filename}`} download className="text-xs text-indigo-400 hover:text-indigo-300">Download</a>
+            <button
+              onClick={async () => {
+                const id = result.filename.replace('.mp4', '')
+                const res = await fetch(`/api/generate/last-frame/${id}`, { method: 'POST' })
+                const data = await res.json()
+                if (data.filename) {
+                  setSourceImageUrl(data.url)
+                  setSourceImage(null)
+                  setResult(null)
+                  setProgress(null)
+                  setStatusMsg('')
+                  setPrompt('')
+                }
+              }}
+              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg"
+            >
+              Continue from Last Frame
+            </button>
           </div>
         </div>
       )}

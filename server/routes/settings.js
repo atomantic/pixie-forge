@@ -46,7 +46,7 @@ router.post('/detect-python', (req, res) => {
 
   const candidates = process.platform === 'win32'
     ? [
-        path.join(home, '.ltx-web-local', 'venv', 'Scripts', 'python.exe'),
+        path.join(home, '.pixie-forge', 'venv', 'Scripts', 'python.exe'),
         path.join(home, 'miniconda3', 'python.exe'),
         path.join(home, 'anaconda3', 'python.exe'),
         path.join(home, 'AppData', 'Local', 'Programs', 'Python', 'Python313', 'python.exe'),
@@ -57,7 +57,7 @@ router.post('/detect-python', (req, res) => {
         'C:\\Python311\\python.exe',
       ]
     : [
-        `${home}/.ltx-web-local/venv/bin/python3`,
+        `${home}/.pixie-forge/venv/bin/python3`,
         '/opt/miniconda3/bin/python3',
         `${home}/miniconda3/bin/python3`,
         `${home}/.pyenv/shims/python3`,

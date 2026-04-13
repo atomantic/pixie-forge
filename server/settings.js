@@ -2,7 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const os = require('os')
 
-const DATA_DIR = path.join(os.homedir(), '.ltx-web-local')
+const DATA_DIR = path.join(os.homedir(), '.pixie-forge')
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json')
 
 const DEFAULTS = {

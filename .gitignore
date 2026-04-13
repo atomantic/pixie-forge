@@ -2,3 +2,5 @@ node_modules/
 client/dist/
 .env
 *.log
+screenshots
+.playwright-mcp

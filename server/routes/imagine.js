@@ -16,10 +16,10 @@ for (const dir of [IMAGES_DIR, LORAS_DIR]) {
 }
 
 const MODELS = {
-  'flux2-klein-4b': { name: 'Flux 2 Klein 4B', steps: 8, guidance: 3.5 },
-  'flux2-klein-9b': { name: 'Flux 2 Klein 9B', steps: 8, guidance: 3.5 },
   dev: { name: 'Flux 1 Dev', steps: 20, guidance: 3.5 },
   schnell: { name: 'Flux 1 Schnell', steps: 4, guidance: 0 },
+  'flux2-klein-4b': { name: 'Flux 2 Klein 4B (broken in mflux)', steps: 8, guidance: 3.5, broken: true },
+  'flux2-klein-9b': { name: 'Flux 2 Klein 9B (broken in mflux)', steps: 8, guidance: 3.5, broken: true },
 }
 
 const jobs = new Map()
@@ -149,8 +149,10 @@ router.post('/', (req, res) => {
   // Lines to suppress from stderr (xformers/triton warnings, bitsandbytes noise)
   const NOISE_RE = /xformers|xFormers|triton|Triton|bitsandbytes|Please reinstall|Memory-efficient|Set XFORMERS|FutureWarning|UserWarning|DeprecationWarning|torch\.distributed|Unable to import.*torchao|Skipping import of cpp|NOTE: Redirects/i
 
+  let stderrBuffer = ''
   proc.stderr.on('data', (chunk) => {
     const text = chunk.toString()
+    stderrBuffer += text
     const lines = text.split(/[\n\r]+/)
     for (const line of lines) {
       const trimmed = line.trim()
@@ -182,8 +184,9 @@ router.post('/', (req, res) => {
     if (code !== 0) {
       job.status = 'error'
       const reason = signal ? `Killed by signal ${signal}` : `Exit code ${code}`
-      console.log(`❌ Image generation failed: ${reason}`)
-      broadcast({ type: 'error', error: `Generation failed: ${reason}` })
+      const lastLines = stderrBuffer.trim().split('\n').slice(-10).join('\n')
+      console.log(`❌ Image generation failed: ${reason}\n${lastLines}`)
+      broadcast({ type: 'error', error: `Generation failed: ${reason}\n${lastLines}` })
     } else {
       job.status = 'complete'
       console.log(`✅ Image generated: ${filename}`)

@@ -26,7 +26,7 @@ pm2 logs
 
 ## Architecture
 
-Pixie Forge is a PortOS-compatible monorepo with Express.js server (port 5570) and React/Vite client (port 5571). PM2 manages app lifecycles. Data persists to JSON files in `~/.ltx-web-local/`. Runs on macOS (Apple Silicon) and Windows.
+Pixie Forge is a PortOS-compatible monorepo with Express.js server (port 5570) and React/Vite client (port 5571). PM2 manages app lifecycles. Data persists to JSON files in `~/.pixie-forge/`. Runs on macOS (Apple Silicon) and Windows.
 
 ### Port Allocation
 
@@ -37,7 +37,7 @@ Pixie Forge is a PortOS-compatible monorepo with Express.js server (port 5570) a
 
 ### Server (`server/`)
 - `index.js` - Express app, static file serving, route mounting
-- `settings.js` - Settings management (`~/.ltx-web-local/settings.json`)
+- `settings.js` - Settings management (`~/.pixie-forge/settings.json`)
 - `routes/generate.js` - Video generation via Python subprocess with SSE progress
 - `routes/imagine.js` - Image generation via mflux-generate with SSE progress and LoRA support
 - `routes/history.js` - Video history CRUD
@@ -55,8 +55,8 @@ Pixie Forge is a PortOS-compatible monorepo with Express.js server (port 5570) a
 ### Image Generation
 - Uses `mflux-generate` CLI (installed via `pip install mflux`)
 - Supports Flux 2 Klein (4B/9B), Flux 1 Dev, Flux 1 Schnell
-- LoRA support via `.safetensors` files in `~/.ltx-web-local/loras/`
-- Images stored in `~/.ltx-web-local/images/`
+- LoRA support via `.safetensors` files in `~/.pixie-forge/loras/`
+- Images stored in `~/.pixie-forge/images/`
 - Metadata stored as `.metadata.json` files (mflux format)
 
 ### Video Generation

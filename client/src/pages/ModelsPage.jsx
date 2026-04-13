@@ -105,7 +105,7 @@ export default function ModelsPage() {
       {/* LoRA Files */}
       <section>
         <h3 className="text-sm font-medium text-gray-300 mb-3">LoRA Files ({data.loras.length})</h3>
-        <p className="text-xs text-gray-500 mb-3">Drop .safetensors files into ~/.ltx-web-local/loras/ to add more.</p>
+        <p className="text-xs text-gray-500 mb-3">Drop .safetensors files into ~/.pixie-forge/loras/ to add more.</p>
         <div className="space-y-2">
           {data.loras.map(lora => (
             <div key={lora.filename} className="bg-gray-900 border border-gray-700 rounded-lg p-4 flex items-center gap-4">

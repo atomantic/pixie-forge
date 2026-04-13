@@ -11,9 +11,9 @@ PortOS-compatible monorepo managed by PM2.
   - Parses STATUS:/STAGE: lines from stderr for progress
   - SSE (Server-Sent Events) for real-time progress to browser
   - Multer for image uploads (I2V mode)
-  - Settings stored in `~/.ltx-web-local/settings.json`
-  - History stored in `~/.ltx-web-local/history.json`
-  - Videos stored in `~/.ltx-web-local/videos/`
+  - Settings stored in `~/.pixie-forge/settings.json`
+  - History stored in `~/.pixie-forge/history.json`
+  - Videos stored in `~/.pixie-forge/videos/`
 
 - **Client** (`ltx-ui`): React + Vite + Tailwind CSS on port 5571
   - `/` - Generate page (prompt, params, progress, result)

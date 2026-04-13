@@ -15,8 +15,8 @@ export default function ImaginePage() {
   const navigate = useNavigate()
   const [models, setModels] = useState([])
   const [prompt, setPrompt] = useState('')
-  const [negativePrompt, setNegativePrompt] = useState('')
-  const [modelId, setModelId] = useState('flux2-klein-4b')
+  const [negativePrompt, setNegativePrompt] = useState('bad quality, worst quality, worst detail, sketch, censor, signature, watermark, username, ugly, duplicate, morbid, mutilated, poorly drawn face, poorly drawn hands, mutation, deformed, blurry, bad anatomy, bad proportions, extra limbs, disfigured, fused fingers, too many fingers, long neck, multiple hands, multiple heads')
+  const [modelId, setModelId] = useState('dev')
   const [width, setWidth] = useState(1024)
   const [height, setHeight] = useState(1024)
   const [steps, setSteps] = useState('')
@@ -346,29 +346,48 @@ export default function ImaginePage() {
         <div>
           <h3 className="text-lg font-medium text-white mb-4">Gallery</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {gallery.map(img => (
-              <div key={img.filename} className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden group">
-                <img src={`/images/${img.filename}`} alt="" className="w-full aspect-square object-cover" />
-                <div className="p-3 space-y-2">
-                  {img.prompt && <p className="text-xs text-gray-400 line-clamp-2">{img.prompt}</p>}
-                  <p className="text-xs text-gray-600">{new Date(img.createdAt).toLocaleDateString()}</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => sendToVideo(img.filename)}
-                      className="flex-1 px-2 py-1 bg-green-600/20 hover:bg-green-600/40 text-green-400 text-xs rounded border border-green-700"
-                    >
-                      Send to Video
-                    </button>
-                    <button
-                      onClick={() => handleDeleteImage(img.filename)}
-                      className="px-2 py-1 bg-red-600/20 hover:bg-red-600/40 text-red-400 text-xs rounded border border-red-700"
-                    >
-                      Delete
-                    </button>
+            {gallery.map(img => {
+              const modelShort = (img.model || '').split('/').pop() || img.base_model || '?'
+              const loras = (img.lora_paths || []).map(p => p.split('/').pop().replace(/^lora-/, '').replace(/\.safetensors$/, ''))
+              return (
+                <div key={img.filename} className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden group">
+                  <img src={`/images/${img.filename}`} alt="" className="w-full aspect-square object-cover" />
+                  <div className="p-3 space-y-1.5">
+                    {img.prompt && <p className="text-xs text-gray-300 line-clamp-2">{img.prompt}</p>}
+                    <div className="flex flex-wrap gap-1">
+                      <span className="text-[10px] px-1.5 py-0.5 bg-indigo-600/20 text-indigo-300 rounded">{modelShort}</span>
+                      {img.steps && <span className="text-[10px] px-1.5 py-0.5 bg-gray-800 text-gray-400 rounded">{img.steps}steps</span>}
+                      {img.guidance != null && <span className="text-[10px] px-1.5 py-0.5 bg-gray-800 text-gray-400 rounded">cfg {img.guidance}</span>}
+                      {img.quantize && <span className="text-[10px] px-1.5 py-0.5 bg-gray-800 text-gray-400 rounded">q{img.quantize}</span>}
+                      {img.width && <span className="text-[10px] px-1.5 py-0.5 bg-gray-800 text-gray-400 rounded">{img.width}x{img.height}</span>}
+                      {img.seed != null && <span className="text-[10px] px-1.5 py-0.5 bg-gray-800 text-gray-500 rounded">seed {img.seed}</span>}
+                    </div>
+                    {loras.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {loras.map(l => <span key={l} className="text-[10px] px-1.5 py-0.5 bg-purple-600/20 text-purple-300 rounded">{l}</span>)}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-gray-600">{new Date(img.createdAt).toLocaleDateString()}{img.generation_time_seconds ? ` (${img.generation_time_seconds.toFixed(1)}s)` : ''}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => sendToVideo(img.filename)}
+                        className="flex-1 px-2 py-1 bg-green-600/20 hover:bg-green-600/40 text-green-400 text-xs rounded border border-green-700"
+                      >
+                        Send to Video
+                      </button>
+                      <button
+                        onClick={() => handleDeleteImage(img.filename)}
+                        className="px-2 py-1 bg-red-600/20 hover:bg-red-600/40 text-red-400 text-xs rounded border border-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}

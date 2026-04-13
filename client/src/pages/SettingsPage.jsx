@@ -154,7 +154,7 @@ export default function SettingsPage() {
           type="text"
           value={settings.outputDir || ''}
           onChange={e => setSettings(s => ({ ...s, outputDir: e.target.value }))}
-          placeholder="Leave blank for default (~/.ltx-web-local/videos)"
+          placeholder="Leave blank for default (~/.pixie-forge/videos)"
           className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200"
         />
       </section>
