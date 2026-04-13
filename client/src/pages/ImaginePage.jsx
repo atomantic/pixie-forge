@@ -144,6 +144,52 @@ export default function ImaginePage() {
       .catch(() => {})
   }
 
+  // Map mflux metadata model strings back to our model IDs
+  const MODEL_REVERSE = {
+    'black-forest-labs/FLUX.1-dev': 'dev',
+    'black-forest-labs/FLUX.1-schnell': 'schnell',
+    'black-forest-labs/FLUX.1-Fill-dev': 'dev',
+    'FLUX.1-dev': 'dev',
+    'FLUX.1-schnell': 'schnell',
+    dev: 'dev',
+    schnell: 'schnell',
+    'flux2-klein-4b': 'flux2-klein-4b',
+    'flux2-klein-9b': 'flux2-klein-9b',
+  }
+
+  function handleRemix(img) {
+    if (img.prompt) setPrompt(img.prompt)
+    if (img.negative_prompt) setNegativePrompt(img.negative_prompt)
+    if (img.seed != null) setSeed(String(img.seed))
+    if (img.steps) setSteps(String(img.steps))
+    if (img.guidance != null) setGuidance(String(img.guidance))
+    if (img.quantize) setQuantize(String(img.quantize))
+    if (img.width) setWidth(img.width)
+    if (img.height) setHeight(img.height)
+
+    const metaModel = img.model || img.base_model || ''
+    const mappedId = MODEL_REVERSE[metaModel]
+    if (mappedId) setModelId(mappedId)
+
+    // Restore LoRAs if they're still available
+    if (img.lora_paths?.length) {
+      const restored = img.lora_paths.map((p, i) => {
+        const match = availableLoras.find(l => l.path === p || l.filename === p.split('/').pop())
+        if (!match) return null
+        return { path: match.path, name: match.name, scale: img.lora_scales?.[i] ?? 1.0 }
+      }).filter(Boolean)
+      setSelectedLoras(restored)
+    } else {
+      setSelectedLoras([])
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function handleCopyPrompt(text) {
+    navigator.clipboard.writeText(text)
+  }
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <form onSubmit={handleGenerate} className="space-y-6">
@@ -353,7 +399,21 @@ export default function ImaginePage() {
                 <div key={img.filename} className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden group">
                   <img src={`/images/${img.filename}`} alt="" className="w-full aspect-square object-cover" />
                   <div className="p-3 space-y-1.5">
-                    {img.prompt && <p className="text-xs text-gray-300 line-clamp-2">{img.prompt}</p>}
+                    {img.prompt && (
+                      <div className="flex items-start gap-1">
+                        <p className="text-xs text-gray-300 line-clamp-2 flex-1">{img.prompt}</p>
+                        <button
+                          onClick={() => handleCopyPrompt(img.prompt)}
+                          className="shrink-0 p-0.5 text-gray-500 hover:text-gray-300 transition-colors"
+                          title="Copy prompt"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                            <path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z" />
+                            <path d="M4.5 6A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18h7a1.5 1.5 0 001.5-1.5v-5.879a1.5 1.5 0 00-.44-1.06L9.44 6.439A1.5 1.5 0 008.378 6H4.5z" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-1">
                       <span className="text-[10px] px-1.5 py-0.5 bg-indigo-600/20 text-indigo-300 rounded">{modelShort}</span>
                       {img.steps && <span className="text-[10px] px-1.5 py-0.5 bg-gray-800 text-gray-400 rounded">{img.steps}steps</span>}
@@ -371,6 +431,12 @@ export default function ImaginePage() {
                       <span className="text-[10px] text-gray-600">{new Date(img.createdAt).toLocaleDateString()}{img.generation_time_seconds ? ` (${img.generation_time_seconds.toFixed(1)}s)` : ''}</span>
                     </div>
                     <div className="flex gap-2">
+                      <button
+                        onClick={() => handleRemix(img)}
+                        className="flex-1 px-2 py-1 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 text-xs rounded border border-indigo-700"
+                      >
+                        Remix
+                      </button>
                       <button
                         onClick={() => sendToVideo(img.filename)}
                         className="flex-1 px-2 py-1 bg-green-600/20 hover:bg-green-600/40 text-green-400 text-xs rounded border border-green-700"

@@ -15,18 +15,19 @@ for (const dir of [IMAGES_DIR, LORAS_DIR]) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
 }
 
+const IS_MAC = process.platform === 'darwin'
 const MODELS = {
   dev: { name: 'Flux 1 Dev', steps: 20, guidance: 3.5 },
   schnell: { name: 'Flux 1 Schnell', steps: 4, guidance: 0 },
-  'flux2-klein-4b': { name: 'Flux 2 Klein 4B (broken in mflux)', steps: 8, guidance: 3.5, broken: true },
-  'flux2-klein-9b': { name: 'Flux 2 Klein 9B (broken in mflux)', steps: 8, guidance: 3.5, broken: true },
+  'flux2-klein-4b': { name: 'Flux 2 Klein 4B', steps: 8, guidance: 3.5, broken: IS_MAC },
+  'flux2-klein-9b': { name: 'Flux 2 Klein 9B', steps: 8, guidance: 3.5, broken: IS_MAC },
 }
 
 const jobs = new Map()
 let activeProcess = null
 
 router.get('/models', (req, res) => {
-  res.json(Object.entries(MODELS).map(([id, m]) => ({ id, ...m })))
+  res.json(Object.entries(MODELS).filter(([, m]) => !m.broken).map(([id, m]) => ({ id, ...m })))
 })
 
 // List available LoRA files from the loras directory
