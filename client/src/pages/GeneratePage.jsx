@@ -43,6 +43,19 @@ export default function GeneratePage() {
     }).catch(() => {})
   }, [])
 
+  const hasSourceImage = Boolean(sourceImage || sourceImageUrl)
+  const availableModels = useMemo(
+    () => (hasSourceImage ? models.filter(m => m.i2v !== false) : models),
+    [models, hasSourceImage],
+  )
+
+  useEffect(() => {
+    if (!hasSourceImage || availableModels.length === 0) return
+    if (!availableModels.some(m => m.id === modelId)) {
+      setModelId(availableModels[0].id)
+    }
+  }, [hasSourceImage, availableModels, modelId])
+
   const sourceImagePreview = useMemo(() => {
     if (sourceImageUrl) return sourceImageUrl
     if (!sourceImage) return null
@@ -203,6 +216,9 @@ export default function GeneratePage() {
               </div>
             )}
           </div>
+          {hasSourceImage && (
+            <p className="mt-2 text-xs text-gray-500">I2V only works with non-quantized models — Q4 distilled is hidden while a source image is set.</p>
+          )}
         </div>
 
         {/* Parameters Grid */}
@@ -211,7 +227,7 @@ export default function GeneratePage() {
           <div>
             <label className="block text-xs font-medium text-gray-400 mb-1">Model</label>
             <select value={modelId} onChange={e => setModelId(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200">
-              {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              {availableModels.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>
 
