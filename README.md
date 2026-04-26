@@ -1,5 +1,7 @@
 # Pixie Forge
 
+> **⚠️ This project has been merged into the core of [PortOS](https://github.com/atomantic/PortOS) and is no longer maintained as a separate app.** See [PortOS#161](https://github.com/atomantic/PortOS/pull/161) for the merge. This repository is archived — please use PortOS for ongoing development and updates.
+
 A simplified, custom local web server for AI image and video generation on macOS (Apple Silicon) and Windows. Built as a [PortOS](https://github.com/atomantic/portos)-compatible app.
 
 Pixie Forge provides a clean browser UI for generating images with [Flux](https://huggingface.co/black-forest-labs) models and videos with [LTX-Video](https://huggingface.co/Lightricks/LTX-Video) models, all running locally on your hardware with no cloud dependencies.
