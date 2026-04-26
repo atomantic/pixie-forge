@@ -24,13 +24,13 @@ const upload = multer({
 })
 
 const MODELS_MACOS = {
-  ltx2_unified:       { name: 'LTX-2 Unified (~42 GB)',          repo: 'notapalindrome/ltx2-mlx-av',      steps: 30, guidance: 3.0, i2v: true },
-  ltx23_unified:      { name: 'LTX-2.3 Unified Beta (~48 GB)',   repo: 'notapalindrome/ltx23-mlx-av',     steps: 25, guidance: 3.0, i2v: true },
-  ltx23_distilled_q4: { name: 'LTX-2.3 Distilled Q4 (~22 GB, T2V only)', repo: 'notapalindrome/ltx23-mlx-av-q4', steps: 25, guidance: 3.0, i2v: false },
+  ltx2_unified:       { name: 'LTX-2 Unified (~42 GB)',          repo: 'notapalindrome/ltx2-mlx-av',      steps: 30, guidance: 3.0 },
+  ltx23_unified:      { name: 'LTX-2.3 Unified Beta (~48 GB)',   repo: 'notapalindrome/ltx23-mlx-av',     steps: 25, guidance: 3.0 },
+  ltx23_distilled_q4: { name: 'LTX-2.3 Distilled Q4 (~22 GB)',  repo: 'notapalindrome/ltx23-mlx-av-q4',  steps: 25, guidance: 3.0 },
 }
 
 const MODELS_WINDOWS = {
-  ltx_video: { name: 'LTX-Video 0.9.5 — T2V + I2V (~9.5 GB, auto-downloads)', steps: 25, guidance: 3.0, i2v: true },
+  ltx_video: { name: 'LTX-Video 0.9.5 — T2V + I2V (~9.5 GB, auto-downloads)', steps: 25, guidance: 3.0 },
 }
 
 const MODELS = process.platform === 'win32' ? MODELS_WINDOWS : MODELS_MACOS
@@ -87,11 +87,6 @@ router.post('/', upload.single('sourceImage'), (req, res) => {
       console.log(`⚠️ Source image not found: ${localPath}`)
     }
   }
-  // Reject I2V with models whose VAE corrupts the conditioned first frames
-  if (sourceImagePath && model.i2v === false) {
-    if (req.file) fs.unlink(req.file.path, () => {})
-    return res.status(400).json({ error: `Model ${modelId} does not support Image-to-Video. Pick a non-quantized model.` })
-  }
   // Resize source image to match target video resolution before passing to model
   if (sourceImagePath) {
     const ffmpeg = findFfmpeg()
@@ -101,7 +96,8 @@ router.post('/', upload.single('sourceImage'), (req, res) => {
       try {
         execFileSync(ffmpeg, [
           '-i', sourceImagePath,
-          '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:black`,
+          '-vf', `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h}`,
+          '-update', '1', '-frames:v', '1',
           '-y', resizedPath,
         ], { timeout: 10000 })
         console.log(`🖼️ Image-to-Video mode: ${sourceImagePath} → resized to ${w}x${h}`)
